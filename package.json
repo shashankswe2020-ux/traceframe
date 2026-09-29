@@ -3,8 +3,28 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Agent skill for animated, step-by-step system diagrams",
+  "description": "Agent skill for animated architecture and system-flow diagrams: interactive HTML or animated SVG for GitHub READMEs",
   "license": "MIT",
+  "homepage": "https://github.com/shashankswe2020-ux/traceframe#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shashankswe2020-ux/traceframe.git"
+  },
+  "bugs": "https://github.com/shashankswe2020-ux/traceframe/issues",
+  "keywords": [
+    "agent-skills",
+    "claude-code",
+    "codex",
+    "cursor",
+    "github-copilot",
+    "animated-diagrams",
+    "architecture-diagram",
+    "sequence-diagram",
+    "system-design",
+    "animated-svg",
+    "interactive-diagram",
+    "diagram-generator"
+  ],
   "scripts": {
     "gallery": "node scripts/svg.mjs examples/oauth-pkce.json diagrams/oauth-pkce.svg && node scripts/svg.mjs examples/rag-pipeline.json diagrams/rag-pipeline.svg && node scripts/svg.mjs examples/event-driven-order.json diagrams/event-driven-order.svg && node scripts/svg.mjs examples/incident-response.json diagrams/incident-response.svg",
     "check": "npm run gallery"
