@@ -4,6 +4,8 @@
 
 Traceframe is an open-source [agent skill](https://agentskills.io/) that lets your coding agent draw animated system diagrams: request paths, data pipelines, RAG flows, agent loops, event-driven architectures, auth flows, and system design walkthroughs. The agent writes a small JSON spec; Traceframe renders it as an **interactive HTML diagram** or a **self-contained animated SVG** that plays inside GitHub READMEs, pull requests, and docs.
 
+**[Website and live interactive demos →](https://shashankswe2020-ux.github.io/traceframe/)**
+
 [![Install with npx skills](https://img.shields.io/badge/install-npx%20skills%20add%20shashankswe2020--ux%2Ftraceframe-111111?logo=npm&logoColor=white)](#install-the-skill)
 [![Works with Claude Code, Codex, Cursor, Copilot](https://img.shields.io/badge/works%20with-Claude%20Code%20%C2%B7%20Codex%20%C2%B7%20Cursor%20%C2%B7%20Copilot-6d28d9)](https://github.com/vercel-labs/skills#supported-agents)
 [![Output: HTML + animated SVG](https://img.shields.io/badge/output-HTML%20%2B%20animated%20SVG-0b7285)](#gallery-animated-diagram-examples)
