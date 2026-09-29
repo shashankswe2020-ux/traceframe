@@ -1,0 +1,85 @@
+{
+  "title": "Grounded RAG Answer Pipeline",
+  "props": {
+    "speed": 1700,
+    "layout": {
+      "direction": "column",
+      "align": "start",
+      "gap": 70,
+      "children": [
+        {
+          "gap": 70,
+          "align": "start",
+          "children": [
+            { "id": "user", "label": "Analyst", "sub": "asks a question", "lines": 3, "width": 220 },
+            { "id": "router", "label": "Query router", "sub": "rewrite + filters", "lines": 3, "width": 220 },
+            { "id": "hybrid", "label": "Hybrid search", "sub": "dense + keyword", "width": 220 },
+            {
+              "id": "kb",
+              "label": "Knowledge base",
+              "direction": "column",
+              "gap": 20,
+              "children": [
+                { "id": "vectors", "label": "Vector index", "sub": "paragraph chunks", "shape": "store", "lines": 2, "width": 200 },
+                { "id": "catalog", "label": "Document catalog", "sub": "ACL + freshness", "shape": "store", "lines": 2, "width": 200 }
+              ]
+            }
+          ]
+        },
+        {
+          "gap": 70,
+          "align": "start",
+          "children": [
+            { "id": "answer", "label": "Answer", "sub": "with sources", "lines": 4, "width": 220 },
+            { "id": "verify", "label": "Citation check", "shape": "decision", "lines": 3, "width": 220 },
+            { "id": "generate", "label": "Generator", "sub": "grounded prompt", "lines": 4, "width": 220 },
+            { "id": "rerank", "label": "Reranker", "sub": "cross-encoder", "lines": 4, "width": 248 }
+          ]
+        }
+      ]
+    },
+    "edges": [
+      { "id": "ask", "from": "user", "to": "router", "label": "question" },
+      { "id": "search", "from": "router", "to": "hybrid", "label": "2 queries" },
+      { "id": "dense", "from": "hybrid", "to": "vectors", "label": "ANN" },
+      { "id": "filter", "from": "hybrid", "to": "catalog", "label": "ACL" },
+      { "id": "candidates", "from": "kb", "to": "rerank", "label": "top 40" },
+      { "id": "context", "from": "rerank", "to": "generate", "label": "top 5" },
+      { "id": "draft", "from": "generate", "to": "verify", "label": "claims" },
+      { "id": "accept", "from": "verify", "to": "answer", "label": "supported" },
+      { "id": "retry", "from": "verify", "to": "router", "label": "broaden" },
+      { "id": "deliver", "from": "answer", "to": "user", "label": "response" }
+    ],
+    "steps": [
+      {
+        "label": "retrieve",
+        "flow": [
+          { "edges": { "edge": "ask", "data": "refund window?" }, "show": { "user": [{ "tag": "ask", "tone": "gray", "text": "Can enterprise invoices be refunded after 30 days?" }] }, "say": "An analyst asks a policy question with a precise time condition." },
+          { "edges": "search", "show": { "router": [{ "tag": "semantic", "tone": "blue", "text": "enterprise invoice refund policy" }, { "tag": "exact", "tone": "gray", "text": "\"30 days\" refund", "mono": true }] }, "say": "The router produces semantic and exact-match queries." },
+          { "edges": ["dense", "filter"], "show": { "vectors": [{ "text": "Billing policy v4 section 7", "meta": "0.86" }, { "text": "Support handbook refunds", "meta": "0.79" }], "catalog": [{ "tag": "acl", "tone": "green", "text": "finance-team", "mark": "allowed" }, { "tag": "fresh", "tone": "blue", "text": "updated 12 Sep" }] }, "say": "Search runs in parallel while catalog rules remove stale or restricted documents." },
+          { "edges": { "edge": "candidates", "data": "40 chunks" }, "say": "Forty eligible chunks move to semantic reranking." },
+          { "light": ["rerank"], "show": { "rerank": [{ "tag": "1", "tone": "green", "text": "Policy v4 section 7", "meta": "0.94" }, { "tag": "2", "tone": "blue", "text": "Exception matrix", "meta": "0.88" }, { "tag": "3", "tone": "gray", "text": "Support handbook", "meta": "0.71" }] }, "say": "The reranker promotes direct policy evidence above general guidance." }
+        ]
+      },
+      {
+        "label": "answer with evidence",
+        "flow": [
+          { "edges": { "edge": "context", "data": "5 passages" }, "show": { "generate": [{ "tag": "rule", "tone": "blue", "text": "Standard window: 30 days" }, { "tag": "exception", "tone": "purple", "text": "Enterprise: written approval" }] }, "say": "Only the five strongest passages enter the generation prompt." },
+          { "edges": "draft", "show": { "generate": [{ "text": "After 30 days, enterprise refunds require Finance approval.", "mark": "draft" }, { "text": "Policy v4 section 7", "meta": "citation 1" }] }, "say": "The model drafts each claim beside its supporting passage." },
+          { "light": ["verify"], "show": { "verify": [{ "tag": "claim", "tone": "green", "text": "Finance approval required", "mark": "entailed" }, { "tag": "date", "tone": "green", "text": "after 30 days", "mark": "entailed" }] }, "say": "A verifier checks that the cited text entails every material claim." },
+          { "edges": "accept", "show": { "answer": [{ "tag": "answer", "tone": "green", "text": "Yes, with written Finance approval." }, { "tag": "source", "tone": "blue", "text": "Billing policy v4", "meta": "section 7" }] }, "say": "Supported claims become a concise answer with inspectable citations." },
+          { "edges": { "edge": "deliver", "data": "answer + citations" }, "say": "The analyst receives the answer and its evidence together." }
+        ]
+      },
+      {
+        "label": "insufficient evidence",
+        "flow": [
+          { "edges": { "edge": "context", "data": "weak passages" }, "show": { "rerank": [{ "tag": "top", "tone": "orange", "text": "Regional tax FAQ", "meta": "0.48" }] }, "say": "A different question returns only weakly related evidence." },
+          { "edges": "draft", "show": { "generate": [{ "text": "A tentative answer", "meta": "missing policy source", "mark": "hold" }] }, "say": "Generation may draft, but unsupported language cannot pass verification." },
+          { "edges": "retry", "show": { "verify": [{ "tag": "fail", "tone": "orange", "text": "No passage entails the claim" }] }, "say": "The verifier broadens retrieval instead of presenting a guess." },
+          { "light": ["answer"], "show": { "answer": [{ "tag": "honest", "tone": "gray", "text": "I could not find an approved policy." }, { "text": "Escalate to Finance operations", "mark": "next" }] }, "say": "If evidence stays weak, the system abstains and offers a next step." }
+        ]
+      }
+    ]
+  }
+}

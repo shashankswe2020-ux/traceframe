@@ -1,0 +1,82 @@
+{
+  "title": "Event-Driven Order Fulfillment",
+  "props": {
+    "speed": 1650,
+    "layout": {
+      "gap": 110,
+      "children": [
+        { "id": "shop", "label": "Storefront", "sub": "checkout", "lines": 3, "width": 200 },
+        {
+          "label": "Order service",
+          "direction": "column",
+          "gap": 60,
+          "children": [
+            { "id": "orders", "label": "Order API", "sub": "idempotency key", "width": 200 },
+            {
+              "gap": 30,
+              "children": [
+                { "id": "db", "label": "Orders", "sub": "state machine", "shape": "store", "lines": 3, "width": 200 },
+                { "id": "outbox", "label": "Outbox", "sub": "same transaction", "shape": "store", "lines": 3, "width": 200 }
+              ]
+            }
+          ]
+        },
+        { "id": "bus", "label": "Event bus", "sub": "at-least-once", "shape": "store", "lines": 3, "width": 210 },
+        {
+          "label": "Consumers",
+          "direction": "column",
+          "gap": 30,
+          "children": [
+            { "id": "payment", "label": "Payment", "sub": "authorize card", "lines": 2, "width": 200 },
+            { "id": "inventory", "label": "Inventory", "sub": "reserve stock", "lines": 2, "width": 200 },
+            { "id": "shipping", "label": "Shipping", "sub": "create label", "lines": 2, "width": 200 },
+            { "id": "dead", "label": "Dead-letter queue", "shape": "store", "lines": 2, "width": 200 }
+          ]
+        }
+      ]
+    },
+    "edges": [
+      { "id": "place", "from": "shop", "to": "orders", "label": "POST /orders" },
+      { "id": "persist", "from": "orders", "to": "db", "label": "write" },
+      { "id": "stage", "from": "orders", "to": "outbox", "label": "same tx" },
+      { "id": "publish", "from": "outbox", "to": "bus", "label": "relay" },
+      { "id": "update", "from": "bus", "to": "orders", "label": "project" },
+      { "id": "pay", "from": "bus", "to": "payment", "label": "consume" },
+      { "id": "stock", "from": "bus", "to": "inventory", "label": "consume" },
+      { "id": "ship", "from": "bus", "to": "shipping", "label": "ReadyToShip" },
+      { "id": "dlq", "from": "bus", "to": "dead", "label": "after 5" }
+    ],
+    "steps": [
+      {
+        "label": "place order",
+        "flow": [
+          { "edges": { "edge": "place", "data": "order 7F3" }, "show": { "shop": [{ "tag": "cart", "tone": "blue", "text": "Trail shoes x1", "meta": "$128" }, { "tag": "key", "tone": "gray", "text": "checkout-9a2", "mono": true }] }, "say": "Checkout sends the order with a stable idempotency key." },
+          { "edges": ["persist", "stage"], "show": { "db": [{ "tag": "7F3", "tone": "blue", "text": "PENDING", "mono": true }], "outbox": [{ "tag": "new", "tone": "green", "text": "OrderPlaced:7F3", "mono": true }] }, "say": "Order state and its event commit in one database transaction." },
+          { "edges": { "edge": "publish", "data": "OrderPlaced" }, "show": { "bus": [{ "tag": "event", "tone": "purple", "text": "OrderPlaced", "meta": "7F3 offset 1042" }] }, "say": "The outbox relay publishes without risking a lost event." },
+          { "edges": ["pay", "stock"], "show": { "payment": [{ "tag": "auth", "tone": "gray", "text": "Visa 4242", "meta": "$128" }], "inventory": [{ "tag": "sku", "tone": "gray", "text": "TRAIL-42", "meta": "3 available" }] }, "say": "Payment authorization and stock reservation run independently." }
+        ]
+      },
+      {
+        "label": "fulfill once",
+        "flow": [
+          { "edges": [{ "edge": "pay", "back": true, "data": "PaymentAuthorized" }, { "edge": "stock", "back": true, "data": "StockReserved" }], "show": { "payment": [{ "tag": "paid", "tone": "green", "text": "auth_82K", "mark": "ok" }], "inventory": [{ "tag": "held", "tone": "green", "text": "TRAIL-42", "meta": "order 7F3", "mark": "ok" }] }, "say": "Both consumers emit durable outcomes keyed by order id." },
+          { "edges": "update", "say": "A projector feeds both outcomes back to the order service." },
+          { "edges": "persist", "show": { "db": [{ "tag": "7F3", "tone": "green", "text": "READY", "mono": true }, { "text": "payment + stock complete", "mark": "2/2" }] }, "say": "State advances only after both prerequisites arrive." },
+          { "edges": { "edge": "ship", "data": "ReadyToShip" }, "show": { "shipping": [{ "tag": "label", "tone": "blue", "text": "UPS 1Z84...", "mark": "new" }] }, "say": "A single readiness event creates the shipping label." },
+          { "edges": "ship", "show": { "shipping": [{ "tag": "duplicate", "tone": "gray", "text": "order 7F3", "meta": "already handled", "mark": "skip" }] }, "say": "A redelivered event is harmless because consumers record handled ids." }
+        ]
+      },
+      {
+        "label": "failure path",
+        "flow": [
+          { "edges": "pay", "show": { "payment": [{ "tag": "error", "tone": "orange", "text": "gateway timeout", "meta": "attempt 1" }] }, "say": "A transient gateway timeout leaves the message unacknowledged." },
+          { "edges": { "edge": "pay", "data": "attempt 2" }, "show": { "bus": [{ "tag": "retry", "tone": "orange", "text": "OrderPlaced:7F3", "meta": "attempt 2 in 10 s" }] }, "say": "The bus retries with backoff while preserving the order id." },
+          { "edges": "dlq", "show": { "dead": [{ "tag": "failed", "tone": "orange", "text": "OrderPlaced:7F3", "meta": "5 attempts" }] }, "say": "Repeated failure moves the event to an inspectable dead-letter queue." },
+          { "edges": { "edge": "pay", "data": "VoidAuthorization" }, "show": { "payment": [{ "tag": "void", "tone": "purple", "text": "auth_82K", "mark": "reversed" }] }, "say": "If stock failed after payment, compensation voids the authorization." },
+          { "edges": "update", "say": "The cancellation outcome flows back to the order service." },
+          { "edges": "persist", "show": { "db": [{ "tag": "7F3", "tone": "orange", "text": "CANCELLED", "mono": true }, { "text": "payment reversed", "mark": "closed" }] }, "say": "The order records a final, auditable cancellation state." }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "traceframe",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Agent skill for animated, step-by-step system diagrams",
+  "license": "MIT",
+  "scripts": {
+    "gallery": "node scripts/svg.mjs examples/oauth-pkce.json diagrams/oauth-pkce.svg && node scripts/svg.mjs examples/rag-pipeline.json diagrams/rag-pipeline.svg && node scripts/svg.mjs examples/event-driven-order.json diagrams/event-driven-order.svg && node scripts/svg.mjs examples/incident-response.json diagrams/incident-response.svg",
+    "check": "npm run gallery"
+  }
+}

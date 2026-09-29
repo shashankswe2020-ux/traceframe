@@ -1,0 +1,97 @@
+{
+  "title": "Automated Incident Response",
+  "props": {
+    "speed": 1750,
+    "layout": {
+      "gap": 110,
+      "align": "start",
+      "children": [
+        {
+          "label": "Evidence",
+          "direction": "column",
+          "gap": 24,
+          "children": [
+            { "id": "metrics", "label": "Metrics", "sub": "latency + errors", "shape": "store", "lines": 3, "width": 210 },
+            { "id": "logs", "label": "Logs", "sub": "request traces", "shape": "store", "lines": 2, "width": 210 },
+            { "id": "deploys", "label": "Deploy history", "sub": "release metadata", "shape": "store", "lines": 2, "width": 210 },
+            { "id": "timeline", "label": "Incident timeline", "shape": "store", "lines": 4, "width": 210 }
+          ]
+        },
+        {
+          "label": "Response control plane",
+          "direction": "column",
+          "gap": 40,
+          "children": [
+            { "id": "alert", "label": "Alert manager", "sub": "dedupe + route", "lines": 3, "width": 220 },
+            { "id": "triage", "label": "Triage agent", "sub": "evidence first", "lines": 3, "width": 220 },
+            { "id": "gate", "label": "Change gate", "shape": "decision", "lines": 3, "width": 220 }
+          ]
+        },
+        {
+          "direction": "column",
+          "gap": 30,
+          "children": [
+            {
+              "label": "Production",
+              "direction": "column",
+              "gap": 40,
+              "children": [
+                { "id": "service", "label": "Checkout API", "sub": "release 2026.09.4", "lines": 3, "width": 220 },
+                { "id": "rollback", "label": "Rollback runner", "sub": "progressive", "lines": 2, "width": 220 }
+              ]
+            },
+            {
+              "label": "People",
+              "children": [
+                { "id": "oncall", "label": "On-call engineer", "sub": "owns escalation", "lines": 3, "width": 220 }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "edges": [
+      { "id": "fire", "from": "metrics", "to": "alert", "label": "SLO burn" },
+      { "id": "open", "from": "alert", "to": "triage", "label": "incident" },
+      { "id": "read-logs", "from": "triage", "to": "logs", "label": "query" },
+      { "id": "read-deploys", "from": "triage", "to": "deploys", "label": "correlate" },
+      { "id": "write", "from": "triage", "to": "timeline", "label": "evidence" },
+      { "id": "probe", "from": "triage", "to": "service", "label": "health check" },
+      { "id": "propose", "from": "triage", "to": "gate", "label": "rollback plan" },
+      { "id": "page", "from": "gate", "to": "oncall", "label": "approval" },
+      { "id": "execute", "from": "gate", "to": "rollback", "label": "authorized" },
+      { "id": "shift", "from": "rollback", "to": "service", "label": "traffic" }
+    ],
+    "steps": [
+      {
+        "label": "detect and correlate",
+        "flow": [
+          { "edges": { "edge": "fire", "data": "14x burn" }, "show": { "metrics": [{ "tag": "p95", "tone": "orange", "text": "2.8 s", "meta": "target 400 ms" }, { "tag": "5xx", "tone": "orange", "text": "7.4%", "meta": "checkout" }] }, "say": "Checkout breaches both latency and error-rate objectives." },
+          { "edges": "open", "show": { "alert": [{ "tag": "inc", "tone": "orange", "text": "INC-284", "mono": true }, { "text": "checkout-api SLO burn", "meta": "severity 1" }] }, "say": "Alert grouping opens one incident instead of two noisy pages." },
+          { "edges": ["read-logs", "read-deploys"], "show": { "logs": [{ "tag": "error", "tone": "orange", "text": "tax lookup timeout", "meta": "81% of failures" }], "deploys": [{ "tag": "release", "tone": "purple", "text": "2026.09.4", "meta": "started 8 min ago" }] }, "say": "Triage compares failure signatures with recent production changes." },
+          { "edges": "probe", "show": { "service": [{ "tag": "new", "tone": "orange", "text": "tax-client v3", "meta": "timeout 3 s" }, { "tag": "old", "tone": "green", "text": "tax-client v2", "meta": "timeout 300 ms" }] }, "say": "A read-only probe confirms the new dependency path is unhealthy." },
+          { "edges": "write", "show": { "timeline": [{ "tag": "10:42", "tone": "gray", "text": "SLO alert opened" }, { "tag": "10:44", "tone": "blue", "text": "release correlation found" }, { "tag": "10:45", "tone": "green", "text": "root cause confidence 0.93" }] }, "say": "Every observation lands in a shared, timestamped timeline." }
+        ]
+      },
+      {
+        "label": "guarded rollback",
+        "flow": [
+          { "edges": "propose", "show": { "triage": [{ "tag": "cause", "tone": "orange", "text": "tax-client v3", "meta": "confidence 0.93" }, { "tag": "action", "tone": "blue", "text": "rollback to 2026.09.3" }] }, "say": "The agent proposes a bounded rollback with supporting evidence." },
+          { "edges": "page", "show": { "oncall": [{ "tag": "page", "tone": "orange", "text": "INC-284", "meta": "rollback ready" }] }, "say": "High-impact production changes still require an accountable human." },
+          { "edges": { "edge": "page", "back": true, "data": "approved" }, "show": { "gate": [{ "tag": "policy", "tone": "green", "text": "one-release rollback" }, { "tag": "owner", "tone": "blue", "text": "Mina Chen", "mark": "approved" }] }, "say": "The gate records policy checks and explicit approval." },
+          { "edges": "execute", "show": { "rollback": [{ "tag": "stage", "tone": "blue", "text": "10% traffic", "meta": "2 min observation" }] }, "say": "Rollback starts with a small canary instead of shifting everything." },
+          { "edges": "shift", "show": { "service": [{ "tag": "stable", "tone": "green", "text": "release 2026.09.3", "meta": "10% traffic" }] }, "say": "The prior release receives a controlled slice of production traffic." }
+        ]
+      },
+      {
+        "label": "verify recovery",
+        "flow": [
+          { "edges": { "edge": "fire", "data": "burn 0.4x" }, "show": { "metrics": [{ "tag": "p95", "tone": "green", "text": "310 ms", "meta": "recovered" }, { "tag": "5xx", "tone": "green", "text": "0.2%", "meta": "normal" }] }, "say": "Canary telemetry returns to the healthy baseline." },
+          { "edges": "execute", "show": { "rollback": [{ "tag": "stage", "tone": "green", "text": "100% traffic", "mark": "complete" }] }, "say": "Passing health checks allow the rollback to finish progressively." },
+          { "edges": "write", "show": { "timeline": [{ "tag": "10:47", "tone": "blue", "text": "rollback approved" }, { "tag": "10:50", "tone": "green", "text": "canary healthy" }, { "tag": "10:54", "tone": "green", "text": "SLO recovered", "mark": "resolved" }] }, "say": "The final timeline preserves decisions, evidence, and recovery milestones." },
+          { "light": ["oncall"], "show": { "oncall": [{ "tag": "next", "tone": "purple", "text": "review tax-client timeout" }, { "tag": "owner", "tone": "gray", "text": "Payments platform", "meta": "due Friday" }] }, "say": "The on-call closes the incident with a concrete follow-up owner." }
+        ]
+      }
+    ]
+  }
+}

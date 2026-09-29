@@ -1,0 +1,176 @@
+{
+  "title": "Cached API request",
+  "props": {
+    "speed": 1400,
+    "layout": {
+      "gap": 56,
+      "children": [
+        {
+          "id": "client",
+          "label": "Browser",
+          "sub": "React app"
+        },
+        {
+          "id": "backend",
+          "label": "Backend",
+          "direction": "row",
+          "gap": 48,
+          "children": [
+            {
+              "id": "api",
+              "label": "API server",
+              "sub": "GET /users/42"
+            },
+            {
+              "id": "data",
+              "direction": "column",
+              "gap": 28,
+              "children": [
+                {
+                  "id": "cache",
+                  "label": "Redis",
+                  "sub": "TTL 60 s",
+                  "shape": "store"
+                },
+                {
+                  "id": "db",
+                  "label": "Postgres",
+                  "sub": "users table",
+                  "shape": "store"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "edges": [
+      {
+        "id": "req",
+        "from": "client",
+        "to": "api",
+        "label": "fetch"
+      },
+      {
+        "id": "get",
+        "from": "api",
+        "to": "cache",
+        "label": "GET"
+      },
+      {
+        "id": "query",
+        "from": "api",
+        "to": "db",
+        "label": "SELECT"
+      },
+      {
+        "id": "fill",
+        "from": "db",
+        "to": "cache",
+        "label": "SET",
+        "quiet": true
+      }
+    ],
+    "steps": [
+      {
+        "label": "cache miss",
+        "flow": [
+          {
+            "edges": {
+              "edge": "req",
+              "data": "user 42"
+            },
+            "say": "The browser asks for user 42."
+          },
+          {
+            "edges": "get",
+            "show": {
+              "cache": [
+                {
+                  "tag": "miss",
+                  "tone": "orange",
+                  "text": "user:42",
+                  "meta": "not cached"
+                }
+              ]
+            },
+            "say": "The API checks Redis first. Nothing there."
+          },
+          {
+            "edges": "query",
+            "show": {
+              "db": [
+                {
+                  "tag": "row",
+                  "tone": "blue",
+                  "text": "Ada Lovelace",
+                  "meta": "id 42",
+                  "mark": "✓"
+                }
+              ]
+            },
+            "say": "So it reads the row from Postgres…"
+          },
+          {
+            "edges": "fill",
+            "show": {
+              "cache": [
+                {
+                  "tag": "hit",
+                  "tone": "green",
+                  "text": "user:42",
+                  "meta": "expires in 60 s",
+                  "mark": "new"
+                }
+              ]
+            },
+            "say": "…and writes it to Redis for next time."
+          },
+          {
+            "edges": {
+              "edge": "req",
+              "back": true,
+              "data": "200 OK"
+            },
+            "say": "The user comes back in 38 ms."
+          }
+        ]
+      },
+      {
+        "label": "cache hit",
+        "flow": [
+          {
+            "edges": {
+              "edge": "req",
+              "data": "user 42"
+            },
+            "say": "Same request, a few seconds later."
+          },
+          {
+            "edges": "get",
+            "show": {
+              "cache": [
+                {
+                  "tag": "hit",
+                  "tone": "green",
+                  "text": "user:42",
+                  "meta": "Ada Lovelace",
+                  "mark": "✓"
+                }
+              ]
+            },
+            "say": "Redis has it. Postgres is never touched."
+          },
+          {
+            "edges": {
+              "edge": "req",
+              "back": true,
+              "data": "200 OK"
+            },
+            "say": "The user comes back in 3 ms."
+          }
+        ]
+      }
+    ]
+  }
+}
