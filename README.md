@@ -18,13 +18,36 @@ Traceframe is an agent skill for explaining request paths, pipelines, agent loop
 
 ## Install
 
-Traceframe requires Node.js 22.18 or newer. Clone it into the skills directory used by your coding agent. For GitHub Copilot:
+One command installs Traceframe into Claude Code, Codex, Cursor, GitHub Copilot, Gemini CLI, OpenCode, and [70+ other agents](https://github.com/vercel-labs/skills#supported-agents):
 
 ```sh
-git clone https://github.com/shashankswe2020-ux/traceframe.git ~/.copilot/skills/traceframe
+npx skills add shashankswe2020-ux/traceframe
 ```
 
-You can also place the repository at `.github/skills/traceframe` inside a project to share it with collaborators.
+The CLI detects your installed agents and asks where to put the skill. To skip the prompts:
+
+```sh
+# Global install for Claude Code and Codex
+npx skills add shashankswe2020-ux/traceframe -g -a claude-code -a codex -y
+
+# This project only, every detected agent
+npx skills add shashankswe2020-ux/traceframe -y
+```
+
+Update later with `npx skills update traceframe`, and remove with `npx skills remove traceframe`. Rendering requires Node.js 22.18 or newer.
+
+<details>
+<summary>Manual install</summary>
+
+Clone the repository into your agent's skills directory, for example:
+
+```sh
+git clone https://github.com/shashankswe2020-ux/traceframe.git ~/.claude/skills/traceframe   # Claude Code
+git clone https://github.com/shashankswe2020-ux/traceframe.git ~/.codex/skills/traceframe    # Codex
+git clone https://github.com/shashankswe2020-ux/traceframe.git ~/.copilot/skills/traceframe  # GitHub Copilot
+```
+
+</details>
 
 Then ask your agent for something like:
 
