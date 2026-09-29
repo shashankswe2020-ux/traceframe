@@ -4,7 +4,12 @@
 
 Traceframe is an agent skill for explaining request paths, pipelines, agent loops, distributed systems, and architecture walkthroughs. Describe the layout and story as JSON; Traceframe renders either an interactive HTML player or a self-contained animated SVG.
 
+[![Install with npx skills](https://img.shields.io/badge/install-npx%20skills%20add%20shashankswe2020--ux%2Ftraceframe-111111?logo=npm&logoColor=white)](#install)
+[![Works with Claude Code, Codex, Cursor, Copilot](https://img.shields.io/badge/works%20with-Claude%20Code%20%C2%B7%20Codex%20%C2%B7%20Cursor%20%C2%B7%20Copilot-6d28d9)](https://github.com/vercel-labs/skills#supported-agents)
+[![Output: HTML + animated SVG](https://img.shields.io/badge/output-HTML%20%2B%20animated%20SVG-0b7285)](#gallery)
+[![Node.js 22.18+](https://img.shields.io/badge/node-%E2%89%A522.18-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![MIT License](https://img.shields.io/badge/license-MIT-0b7285.svg)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/shashankswe2020-ux/traceframe?style=flat&logo=github)](https://github.com/shashankswe2020-ux/traceframe/stargazers)
 
 ![OAuth 2.0 Authorization Code with PKCE](diagrams/oauth-pkce.svg)
 
