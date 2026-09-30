@@ -1,4 +1,5 @@
 {
+  "$schema": "../schema.json",
   "title": "OAuth 2.0 Authorization Code with PKCE",
   "props": {
     "speed": 1700,

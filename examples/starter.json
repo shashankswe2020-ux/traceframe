@@ -1,4 +1,5 @@
 {
+  "$schema": "../schema.json",
   "title": "Cached API request",
   "props": {
     "speed": 1400,

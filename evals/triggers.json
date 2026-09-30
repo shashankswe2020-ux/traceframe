@@ -1,0 +1,17 @@
+[
+  { "query": "draw an architecture diagram of how our checkout service talks to payments and inventory", "should_trigger": true },
+  { "query": "make an animated sequence diagram of the login flow for the README", "should_trigger": true },
+  { "query": "walk me through what happens to a request when it hits the API gateway, visually", "should_trigger": true },
+  { "query": "turn this mermaid sequenceDiagram into an animation", "should_trigger": true },
+  { "query": "visualize this OpenTelemetry trace so I can see where the latency is", "should_trigger": true },
+  { "query": "explain our RAG pipeline with a diagram I can put in the docs", "should_trigger": true },
+  { "query": "animate how the Kafka consumers process an order event", "should_trigger": true },
+  { "query": "I need a GIF showing the deploy pipeline for a Slack post", "should_trigger": true },
+  { "query": "add a diagram to this PR that shows the new retry path", "should_trigger": true },
+  { "query": "plot monthly revenue as a bar chart", "should_trigger": false },
+  { "query": "draw our company org chart", "should_trigger": false },
+  { "query": "fix the failing unit test in checkout.test.ts", "should_trigger": false },
+  { "query": "generate an ER diagram of the database schema with all 40 tables", "should_trigger": false },
+  { "query": "write a mermaid flowchart for this function", "should_trigger": false },
+  { "query": "design a logo for the project", "should_trigger": false }
+]

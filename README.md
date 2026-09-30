@@ -144,4 +144,4 @@ Yes. Write the JSON spec yourself and run `node scripts/svg.mjs` or `node script
 
 ## Credits
 
-The figure player in [`interfig/`](interfig/) comes from Vectorize's Hindsight project and retains its original MIT license. The Traceframe skill, render scripts, and original gallery examples are also MIT licensed.
+The figure player in [`interfig/`](interfig/) is adapted from an MIT-licensed open-source project; its license and copyright notice are in [`interfig/LICENSE`](interfig/LICENSE). The Traceframe skill, render scripts, and gallery examples are also MIT licensed.

@@ -1,0 +1,8 @@
+{
+  "private": true,
+  "description": "Build-time dependencies for scripts/html.mjs, installed into ~/.cache/traceframe with npm ci.",
+  "dependencies": {
+    "esbuild": "0.25.12",
+    "preact": "10.29.8"
+  }
+}

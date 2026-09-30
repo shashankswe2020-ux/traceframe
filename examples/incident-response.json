@@ -1,4 +1,5 @@
 {
+  "$schema": "../schema.json",
   "title": "Automated Incident Response",
   "props": {
     "speed": 1750,

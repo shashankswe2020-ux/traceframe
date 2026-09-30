@@ -19,6 +19,7 @@ export type * from './model';
 
 const DEFAULTS: Required<FigTheme> = {
   accent: '#0074d9',
+  onAccent: '#ffffff',
   fg: '#111418',
   muted: '#4b5563',
   bg: '#ffffff',
@@ -104,7 +105,7 @@ const cardBody = (c: FigContent): ReactNode => {
 /** 1× plays a touch faster than the figures' own timings: they were written to be read slowly. */
 const BASE_RATE = 1.25;
 
-export function Flow({ layout, edges, steps = [], theme, speed = 900, autoplay = true }: FlowProps) {
+export function Flow({ layout, edges, steps = [], theme, speed = 900, autoplay = true, deepLink = false }: FlowProps) {
   const root = useRef<HTMLDivElement>(null);
   const outer = useRef<HTMLDivElement>(null);
   const [fit, setFit] = useState({ scale: 1, height: 0 });
@@ -121,7 +122,11 @@ export function Flow({ layout, edges, steps = [], theme, speed = 900, autoplay =
   const [beat, setBeat] = useState(0);
   const paths = useRef<Record<string, SVGPathElement | null>>({});
   const [routed, setRouted] = useState<Routed[]>([]);
-  const [active, setActive] = useState<number | null>(steps.length ? 0 : null);
+  const [active, setActive] = useState<number | null>(() => {
+    if (!steps.length) return null;
+    const n = deepLink && typeof location !== 'undefined' ? Number(location.hash.match(/step=(\d+)/)?.[1] ?? 1) - 1 : 0;
+    return n >= 0 && n < steps.length ? n : 0;
+  });
   const [playing, setPlaying] = useState(autoplay);
   // The step's clock lives outside React: pausing freezes it, resizing keeps it, only a new step resets it.
   const playingRef = useRef(playing);
@@ -131,6 +136,38 @@ export function Flow({ layout, edges, steps = [], theme, speed = 900, autoplay =
   rateRef.current = rate;
   const clock = useRef<{ beats: unknown; elapsed: number }>({ beats: null, elapsed: 0 });
   const [hover, setHover] = useState<string | null>(null);
+
+  /** Start step `i` from its first beat, even when it is already the active step. */
+  const go = (i: number) => {
+    clock.current.elapsed = 0;
+    setActive(i);
+    setPlaying(true);
+    setBeat(0);
+  };
+  useEffect(() => {
+    if (deepLink && active != null) history.replaceState(null, '', `#step=${active + 1}`);
+  }, [deepLink, active]);
+  // ← → change step, space pauses. A standalone page listens everywhere; an embedded figure only when focused.
+  type Key = { key: string; target: EventTarget | null; altKey: boolean; ctrlKey: boolean; metaKey: boolean; preventDefault(): void };
+  const onKey = (e: Key) => {
+    if (!steps.length || e.altKey || e.ctrlKey || e.metaKey) return;
+    const t = e.target as HTMLElement | null;
+    if (t?.closest?.('input, textarea, select, [contenteditable]')) return;
+    const at = active ?? 0;
+    if (e.key === 'ArrowRight') go((at + 1) % steps.length);
+    else if (e.key === 'ArrowLeft') go((at - 1 + steps.length) % steps.length);
+    else if (e.key === ' ' && !t?.closest?.('button')) setPlaying((p) => !p);
+    else return;
+    e.preventDefault();
+  };
+  const keyRef = useRef(onKey);
+  keyRef.current = onKey;
+  useEffect(() => {
+    if (!deepLink) return;
+    const h = (e: KeyboardEvent) => keyRef.current(e);
+    addEventListener('keydown', h);
+    return () => removeEventListener('keydown', h);
+  }, [deepLink]);
 
   const ids = useMemo(() => edges.map(edgeId), [edges]);
   const tips = useMemo(() => new Set(decisions(layout)), [layout]);
@@ -472,6 +509,9 @@ export function Flow({ layout, edges, steps = [], theme, speed = 900, autoplay =
   return (
     <figure
       className="interfig"
+      tabIndex={deepLink ? undefined : 0}
+      aria-keyshortcuts={steps.length ? 'ArrowLeft ArrowRight Space' : undefined}
+      onKeyDown={deepLink ? undefined : onKey}
       style={{
         ...vars,
         position: full ? 'fixed' : 'relative',
@@ -621,7 +661,7 @@ export function Flow({ layout, edges, steps = [], theme, speed = 900, autoplay =
                   lineHeight: '15px',
                   pointerEvents: 'none',
                   background: v('accent'),
-                  color: '#fff',
+                  color: v('onAccent'),
                   boxShadow: '0 4px 14px rgba(0,0,0,.18)',
                   transition: 'opacity .2s',
                 }}
@@ -648,7 +688,7 @@ export function Flow({ layout, edges, steps = [], theme, speed = 900, autoplay =
                     whiteSpace: 'nowrap',
                     pointerEvents: 'none',
                     background: on ? v('accent') : v('bg'),
-                    color: on ? '#fff' : v('muted'),
+                    color: on ? v('onAccent') : v('muted'),
                     border: `1px solid ${on ? v('accent') : v('border')}`,
                     opacity: !on && e.quiet ? 0 : focus && !on ? 0.6 : 1,
                     fontFamily: MONO,
@@ -695,12 +735,7 @@ export function Flow({ layout, edges, steps = [], theme, speed = 900, autoplay =
                     type="button"
                     role="tab"
                     aria-selected={on}
-                    onClick={() => {
-                      clock.current.elapsed = 0; // replay from the start, even when it is already the active step
-                      setActive(i);
-                      setPlaying(true);
-                      setBeat(0);
-                    }}
+                    onClick={() => go(i)}
                     style={{
                       position: 'relative',
                       overflow: 'hidden',
@@ -757,6 +792,34 @@ export function Flow({ layout, edges, steps = [], theme, speed = 900, autoplay =
               {rate}×
             </button>
           </div>
+          {beats.length > 1 && (
+            // One segment per beat, as long as the beat lasts; click one to jump there.
+            <div style={{ display: 'flex', gap: 3, maxWidth: 360, margin: '10px auto 0' }}>
+              {beats.map((b, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  aria-label={`Go to moment ${i + 1} of ${beats.length}`}
+                  aria-current={i === beat ? 'step' : undefined}
+                  onClick={() => {
+                    clock.current.elapsed = beats.slice(0, i).reduce((n, x) => n + (x.ms ?? speed), 0) + 1;
+                    setBeat(i);
+                  }}
+                  style={{
+                    flex: b.ms ?? speed,
+                    height: 6,
+                    padding: 0,
+                    border: 'none',
+                    borderRadius: 3,
+                    cursor: 'pointer',
+                    background: i <= beat ? v('accent') : v('border'),
+                    opacity: i === beat ? 1 : 0.6,
+                    transition: 'background .2s, opacity .2s',
+                  }}
+                />
+              ))}
+            </div>
+          )}
           {said != null && (
             <div
               key={`${active}-${saidAt}`}

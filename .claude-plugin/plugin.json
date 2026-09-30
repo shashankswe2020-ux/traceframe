@@ -1,0 +1,11 @@
+{
+  "name": "traceframe",
+  "displayName": "Traceframe",
+  "version": "1.1.0",
+  "description": "Animated, step-by-step architecture and system-flow diagrams: interactive HTML, animated SVG for READMEs, or MP4/GIF. Imports Mermaid and OpenTelemetry traces.",
+  "author": { "name": "Shashank Mishra", "url": "https://github.com/shashankswe2020-ux" },
+  "homepage": "https://shashankswe2020-ux.github.io/traceframe/",
+  "repository": "https://github.com/shashankswe2020-ux/traceframe",
+  "license": "MIT",
+  "keywords": ["diagrams", "architecture", "animation", "svg", "mermaid", "opentelemetry"]
+}

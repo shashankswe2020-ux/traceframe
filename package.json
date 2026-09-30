@@ -1,11 +1,10 @@
 {
   "name": "traceframe",
-  "version": "1.0.0",
-  "private": true,
+  "version": "1.1.0",
   "type": "module",
-  "description": "Agent skill for animated architecture and system-flow diagrams: interactive HTML or animated SVG for GitHub READMEs",
+  "description": "Animated architecture and system-flow diagrams from a JSON spec: interactive HTML, animated SVG for GitHub READMEs, or MP4/GIF. Imports Mermaid and OpenTelemetry traces. Also an agent skill.",
   "license": "MIT",
-  "homepage": "https://github.com/shashankswe2020-ux/traceframe#readme",
+  "homepage": "https://shashankswe2020-ux.github.io/traceframe/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/shashankswe2020-ux/traceframe.git"
@@ -23,10 +22,27 @@
     "system-design",
     "animated-svg",
     "interactive-diagram",
-    "diagram-generator"
+    "diagram-generator",
+    "mermaid",
+    "opentelemetry"
   ],
+  "bin": {
+    "traceframe": "scripts/cli.mjs"
+  },
+  "files": [
+    "SKILL.md",
+    "schema.json",
+    "interfig/",
+    "scripts/",
+    "examples/"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
   "scripts": {
+    "test": "node --test \"test/*.test.mjs\"",
+    "lint": "node scripts/lint.mjs examples/*.json",
     "gallery": "node scripts/svg.mjs examples/oauth-pkce.json diagrams/oauth-pkce.svg && node scripts/svg.mjs examples/rag-pipeline.json diagrams/rag-pipeline.svg && node scripts/svg.mjs examples/event-driven-order.json diagrams/event-driven-order.svg && node scripts/svg.mjs examples/incident-response.json diagrams/incident-response.svg",
-    "check": "npm run gallery"
+    "check": "npm test && npm run lint && npm run gallery"
   }
 }

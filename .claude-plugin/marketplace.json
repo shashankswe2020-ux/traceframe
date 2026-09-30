@@ -1,0 +1,12 @@
+{
+  "name": "traceframe",
+  "description": "Traceframe: animated architecture diagrams for AI coding agents",
+  "owner": { "name": "Shashank Mishra" },
+  "plugins": [
+    {
+      "name": "traceframe",
+      "source": "./",
+      "description": "Animated, step-by-step architecture and system-flow diagrams: interactive HTML, animated SVG for READMEs, or MP4/GIF."
+    }
+  ]
+}

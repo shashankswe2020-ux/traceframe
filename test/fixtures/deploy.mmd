@@ -1,0 +1,10 @@
+flowchart LR
+  push([git push]) --> ci[CI tests]
+  ci --> ok{Tests pass?}
+  ok -->|yes| build[Build image]
+  ok -->|no| fail[Notify author]
+  subgraph deploy [Deploy]
+    build --> reg[(Registry)]
+    reg --> canary[Canary 5%]
+  end
+  canary --> prod[Production]

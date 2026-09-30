@@ -1,0 +1,19 @@
+sequenceDiagram
+  title Cached profile lookup
+  participant B as Browser
+  box Backend
+    participant API as API server
+    participant R as Redis
+    participant DB as Postgres
+  end
+  B->>API: GET /users/42
+  API->>R: GET user:42
+  alt cache hit
+    R-->>API: Ada Lovelace
+  else cache miss
+    R-->>API: nil
+    API->>DB: SELECT * FROM users WHERE id = 42
+    DB-->>API: Ada Lovelace
+    API->>R: SET user:42 EX 60
+  end
+  API-->>B: 200 OK

@@ -1,4 +1,5 @@
 {
+  "$schema": "../schema.json",
   "title": "Event-Driven Order Fulfillment",
   "props": {
     "speed": 1650,

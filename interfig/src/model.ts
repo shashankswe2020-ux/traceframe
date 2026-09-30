@@ -62,7 +62,7 @@ export type FigStep = {
   flow: (FigHop | FigHop[] | FigBeat)[];
   nodes?: string[];
 };
-export type FigTheme = Partial<Record<'accent' | 'fg' | 'muted' | 'bg' | 'surface' | 'border' | 'font', string>>;
+export type FigTheme = Partial<Record<'accent' | 'onAccent' | 'fg' | 'muted' | 'bg' | 'surface' | 'border' | 'font', string>>;
 export type FlowProps = {
   layout: FigGroup;
   edges: FigEdge[];
@@ -72,6 +72,8 @@ export type FlowProps = {
   /** Milliseconds a packet takes to cross one edge. */
   speed?: number;
   autoplay?: boolean;
+  /** Standalone pages: keep the step in the URL (#step=2) and take ← → space from anywhere on the page. */
+  deepLink?: boolean;
 };
 /** A ready-made figure: what it shows, where it is used, and what to draw. */
 export type Figure = { title: string; source?: string; props: FlowProps };

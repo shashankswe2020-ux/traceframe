@@ -1,0 +1,68 @@
+{
+  "skill_name": "traceframe",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Make an animated diagram for our README showing how a GET /users/:id request hits the API, checks Redis, and falls back to Postgres on a miss.",
+      "expected_output": "An animated SVG committed under docs/ or similar, with cache-hit and cache-miss steps.",
+      "files": [],
+      "expectations": [
+        "Produces an .svg with scripts/svg.mjs, not hand-written SVG",
+        "Has two steps, one for cache hit and one for cache miss",
+        "Redis and Postgres use shape store",
+        "The reply to the browser replays the request edge with back: true instead of adding a return edge",
+        "Cards show concrete data such as a user id and a name",
+        "scripts/lint.mjs reports no layout warnings for the spec"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Explain the OAuth authorization code flow with PKCE to a new engineer. Something interactive I can open in a browser.",
+      "expected_output": "An interactive HTML page with authorize, token exchange, and refresh steps.",
+      "files": [],
+      "expectations": [
+        "Produces a self-contained .html with scripts/html.mjs",
+        "Shows the code verifier staying on the client and only its hash being sent",
+        "Has separate steps for authorization and token exchange",
+        "Every beat has a one-sentence say",
+        "No layout warnings"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Here's our deploy pipeline in Mermaid. Turn it into something animated we can post in Slack.",
+      "expected_output": "An MP4 or GIF made from the Mermaid source.",
+      "files": ["test/fixtures/deploy.mmd"],
+      "expectations": [
+        "Uses scripts/from-mermaid.mjs to create the spec",
+        "Exports with scripts/video.mjs to .mp4 or .gif",
+        "The yes and no branches of the test decision become separate steps",
+        "The registry is drawn as a store"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "This trace export shows a slow checkout. Animate it so the team can see where the time goes.",
+      "expected_output": "A diagram generated from the trace, showing per-call durations.",
+      "files": ["test/fixtures/checkout-trace.otlp.json"],
+      "expectations": [
+        "Uses scripts/from-otel.mjs on the trace file",
+        "The slow external payment call and its duration are visible in a card or caption",
+        "The failing trace appears as its own step with the error shown",
+        "Databases and the Kafka topic are drawn as stores"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Add a diagram to this PR description that shows what changes: requests now go through a rate limiter before the API.",
+      "expected_output": "An animated SVG with before and after steps or a limited/allowed pair of steps.",
+      "files": [],
+      "expectations": [
+        "The rate limiter is a box between the client and the API, with edges only between neighbours",
+        "Has a step where a request is rejected with 429",
+        "Output is an SVG suitable for a PR description",
+        "No layout warnings"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm test
+      - run: npm run lint
+      - name: Committed diagrams match their specs
+        run: |
+          npm run gallery
+          git diff --exit-code diagrams/
+      - name: HTML player builds with the pinned runtime
+        run: node scripts/html.mjs examples/starter.json "$RUNNER_TEMP/starter.html"
+      - name: CLI works when installed from npm
+        run: |
+          npm pack --pack-destination "$RUNNER_TEMP"
+          cd "$RUNNER_TEMP" && npm init -y > /dev/null && npm install ./traceframe-*.tgz
+          npx traceframe svg node_modules/traceframe/examples/starter.json out.svg
+          npx traceframe lint node_modules/traceframe/examples/*.json

@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/shashankswe2020-ux/traceframe/main/schema.json",
+  "title": "Traceframe figure",
+  "description": "An animated, step-by-step system diagram. Render with scripts/svg.mjs or scripts/html.mjs.",
+  "type": "object",
+  "required": ["props"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "title": { "type": "string", "description": "Page title and the SVG's accessible name." },
+    "source": { "type": "string", "description": "Where the figure is used (free text)." },
+    "props": { "$ref": "#/$defs/props" }
+  },
+  "$defs": {
+    "props": {
+      "type": "object",
+      "required": ["layout", "edges"],
+      "additionalProperties": false,
+      "properties": {
+        "layout": { "$ref": "#/$defs/group" },
+        "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } },
+        "steps": { "type": "array", "items": { "$ref": "#/$defs/step" }, "description": "Each step is one scenario (a tab)." },
+        "theme": { "$ref": "#/$defs/theme" },
+        "speed": { "type": "number", "minimum": 100, "description": "Milliseconds a packet takes to cross one edge. 1200-2200 reads well." },
+        "autoplay": { "type": "boolean", "default": true }
+      }
+    },
+    "group": {
+      "type": "object",
+      "required": ["children"],
+      "additionalProperties": false,
+      "description": "Lays its children out in a row or column. Only a group with a label gets a frame.",
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "logo": { "type": "string", "description": "Image URL shown instead of the label (HTML only)." },
+        "direction": { "enum": ["row", "column"], "default": "row" },
+        "gap": { "type": "number", "minimum": 0 },
+        "align": { "enum": ["start", "center", "end"] },
+        "children": { "type": "array", "items": { "anyOf": [{ "$ref": "#/$defs/group" }, { "$ref": "#/$defs/node" }] } }
+      }
+    },
+    "node": {
+      "type": "object",
+      "required": ["id", "label"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "sub": { "type": "string", "description": "Small muted second line, 4 words or fewer." },
+        "shape": { "enum": ["box", "decision", "store"], "description": "store = database cylinder, decision = diamond." },
+        "lines": { "type": "integer", "minimum": 1, "description": "Minimum content-card height in lines." },
+        "width": { "type": "number", "minimum": 60 }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "required": ["from", "to"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "description": "Defaults to \"from->to\". Give one whenever steps use the edge." },
+        "from": { "type": "string" },
+        "to": { "type": "string" },
+        "label": { "type": "string", "description": "Monospace chip mid-edge: a verb or a call." },
+        "around": { "enum": ["above", "below"], "description": "Arc over or under the boxes in between." },
+        "quiet": { "type": "boolean", "description": "Only drawn while a step uses it." }
+      }
+    },
+    "step": {
+      "type": "object",
+      "required": ["label", "flow"],
+      "additionalProperties": false,
+      "properties": {
+        "label": { "type": "string" },
+        "caption": { "type": "string" },
+        "flow": { "type": "array", "items": { "anyOf": [{ "$ref": "#/$defs/hop" }, { "type": "array", "items": { "$ref": "#/$defs/hop" } }, { "$ref": "#/$defs/beat" }] } },
+        "nodes": { "type": "array", "items": { "type": "string" }, "description": "Boxes lit for the whole step." }
+      }
+    },
+    "hop": {
+      "anyOf": [
+        { "type": "string", "description": "An edge id." },
+        {
+          "type": "object",
+          "required": ["edge"],
+          "additionalProperties": false,
+          "properties": {
+            "edge": { "type": "string" },
+            "back": { "type": "boolean", "description": "Run the packet in reverse: a reply on the same edge." },
+            "data": { "type": "string", "description": "A small card riding on the packet." }
+          }
+        }
+      ]
+    },
+    "beat": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "One moment of a step. No edges = a pause.",
+      "properties": {
+        "edges": { "anyOf": [{ "$ref": "#/$defs/hop" }, { "type": "array", "items": { "$ref": "#/$defs/hop" } }] },
+        "say": { "type": "string", "description": "One short sentence of narration." },
+        "show": { "type": "object", "additionalProperties": { "$ref": "#/$defs/content" } },
+        "light": { "type": "array", "items": { "type": "string" } },
+        "ms": { "type": "number", "minimum": 100 }
+      }
+    },
+    "content": {
+      "anyOf": [
+        { "type": "string" },
+        { "type": "array", "items": { "$ref": "#/$defs/row" } },
+        {
+          "type": "object",
+          "required": ["graph"],
+          "additionalProperties": false,
+          "properties": {
+            "graph": {
+              "type": "object",
+              "required": ["nodes", "links"],
+              "additionalProperties": false,
+              "properties": {
+                "nodes": { "type": "array", "items": { "type": "string" } },
+                "links": { "type": "array", "items": { "type": "array", "items": { "type": "string" }, "minItems": 2, "maxItems": 2 } },
+                "lit": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "row": {
+      "type": "object",
+      "required": ["text"],
+      "additionalProperties": false,
+      "properties": {
+        "tag": { "type": "string" },
+        "tone": { "enum": ["blue", "purple", "green", "orange", "gray"] },
+        "text": { "type": "string" },
+        "meta": { "type": "string" },
+        "mark": { "type": "string" },
+        "mono": { "type": "boolean" }
+      }
+    },
+    "theme": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "accent": { "type": "string" },
+        "onAccent": { "type": "string" },
+        "fg": { "type": "string" },
+        "muted": { "type": "string" },
+        "bg": { "type": "string" },
+        "surface": { "type": "string" },
+        "border": { "type": "string" },
+        "font": { "type": "string" }
+      }
+    }
+  }
+}

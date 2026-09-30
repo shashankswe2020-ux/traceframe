@@ -1,12 +1,12 @@
 ---
 name: traceframe
-description: Draw an animated, step-by-step system diagram (boxes, nested groups, arrows, packets moving along edges, cards filling with data) as an interactive HTML page or a self-contained animated SVG. Use when the user wants to show how something flows or works — a request path, a pipeline, an agent loop, what an API call does, an architecture walkthrough — or asks for an animated / interactive / "clean like the Hindsight docs" diagram.
+description: Draw an animated, step-by-step architecture or system-flow diagram (boxes, groups, arrows with packets moving along them, cards filling with real data, narrated steps) as an interactive HTML page, an animated SVG for GitHub READMEs and PRs, or an MP4/GIF/PNG. Use when the user wants to show how something works or flows: a request path, a sequence diagram, a data or RAG pipeline, an agent loop, an auth flow, an event-driven system, a deploy, what a PR changes, or a replay of a real OpenTelemetry trace. Also converts Mermaid sequence diagrams and flowcharts. Triggers on "architecture diagram", "sequence diagram", "explain this flow", "animate", "walk me through the request".
 ---
 
 # Traceframe
 
-Renders a JSON spec with **interfig** (the MIT-licensed figure player from the Hindsight docs,
-vendored in `interfig/`). You describe *what* is in the picture and *what happens*; the renderer does
+Renders a JSON spec with **interfig** (an MIT-licensed figure player vendored in `interfig/`).
+You describe *what* is in the picture and *what happens*; the renderer does
 the layout, arrows, animation, theming and light/dark mode. **You write JSON — never hand-write SVG,
 HTML or React for the figure.**
 
@@ -22,22 +22,37 @@ For those, draw a plain diagram instead.
 
 | Output | Command | Use for |
 | --- | --- | --- |
-| **Interactive HTML** | `node scripts/html.mjs spec.json out.html` | Artifacts, web pages, docs, anything viewed in a browser. Step tabs, pause, 1×/2×, hover-to-highlight, full-screen. ~240 kB, one file, no network. |
-| **Animated SVG** | `node scripts/svg.mjs spec.json out.svg` | GitHub README / PR / issue, blog posts, Notion — anywhere markdown shows an `<img>`. No controls: every step plays in a loop. 15–180 kB. |
+| **Interactive HTML** | `node scripts/html.mjs spec.json out.html` | Artifacts, web pages, docs, anything viewed in a browser. Step tabs, pause, 1×/2×, beat timeline, ← → keys, `#step=N` links, hover-to-highlight, full-screen. ~40 kB, one file, no network. |
+| **Animated SVG** | `node scripts/svg.mjs spec.json out.svg` | GitHub README / PR / issue, blog posts, Notion: anywhere markdown shows an `<img>`. No controls: every step plays in a loop. 15–180 kB. |
+| **MP4 / GIF / PNG** | `node scripts/video.mjs spec.json out.mp4` | Slack, X, LinkedIn, slides, email, where SVG animation does not play. `--step N` for one scenario; `.png` gives a still (end of `--step`, or `--at SEC`). Needs Chrome, and ffmpeg for MP4/GIF. |
 
 Default to **HTML** when the user will view it here or share a page; **SVG** when it goes into
-markdown. Either takes `-` to read the spec from stdin. Options for HTML: `--title "…"`,
-`--accent "#hex"`. The first HTML run installs react/esbuild into `~/.cache/traceframe` (npm needed).
+markdown. HTML and SVG take `-` to read the spec from stdin, and both accept `--theme default|github|vercel|linear|contrast`
+and `--accent "#hex"` (brand color); HTML also takes `--title "…"`. The first HTML run installs
+pinned esbuild + preact into `~/.cache/traceframe` with `npm ci` (npm needed, about 10 s).
 
 Both outputs embed their spec, so any figure is editable later:
 `node scripts/html.mjs --spec out.html` (or `svg.mjs --spec out.svg`) prints it back.
 
+**Starting from something that exists?**
+- A Mermaid diagram: `node scripts/from-mermaid.mjs diagram.mmd spec.json` (sequenceDiagram or
+  flowchart; also reads the first ```` ```mermaid ```` block of a Markdown file).
+- A real trace: `node scripts/from-otel.mjs trace.json spec.json` (OTLP JSON, Jaeger JSON, or Zipkin v2).
+
+Both give a correct skeleton. Then improve it: real data in cards, one plain sentence per `say`,
+shorter labels, and a layout that passes the lint below.
+
 ## 2. Write the spec
 
 Start from `examples/starter.json` (a small, generic two-scenario figure). For bigger patterns read
-one of the real figures in `examples/` — `what-hindsight-does.json` (three scenarios, nested stores,
-entity graph), `tempr.json` (four branches in parallel then a ranking pipeline), `retain.json`,
-`reflect.json`, `services.json`, `observations.json`.
+one of the gallery figures, all lint-clean:
+- `examples/oauth-pkce.json`: three scenarios, replies replayed with `back: true`, frames as columns.
+- `examples/rag-pipeline.json`: a U-shaped two-row pipeline with a retry loop and a group as an edge end.
+- `examples/event-driven-order.json`: fan-out to consumers, a failure path, compensation.
+- `examples/incident-response.json`: evidence → control plane → production, human approval.
+
+Add `"$schema": "https://raw.githubusercontent.com/shashankswe2020-ux/traceframe/main/schema.json"`
+to a spec for autocomplete and validation in editors.
 
 ```json
 { "title": "…", "props": { "speed": 1400, "layout": {…}, "edges": […], "steps": […] } }
@@ -59,6 +74,20 @@ entity graph), `tempr.json` (four branches in parallel then a ranking pipeline),
 Layout recipe: left-to-right = the direction of the main flow. Put the caller on the left, the
 service in the middle, storage on the right. Use `column` groups to stack alternatives or pipeline
 stages. Nesting depth of 2–3 labeled frames looks good; deeper gets cramped.
+
+### Clean arrows (the lint enforces these)
+
+- **Only connect neighbours.** An edge between boxes that are not next to each other cuts through
+  whatever sits between. Move one of the boxes, or arc it with `around`.
+- **Replies reuse the call's edge.** Play `{ "edge": "call", "back": true, "data": "200 OK" }`
+  instead of adding a return edge. Two edges between the same boxes crowd both sides.
+- **At most 4 arrows on one side of a box.** Past that, reuse edges with `back`, or split the box.
+- **Order boxes inside a column by where their arrows go**, so arrows run parallel instead of crossing.
+- **Long pipelines fold into a U**: a root `column` of two rows, the second row reading right to
+  left, so the turn and the loop back are short vertical edges (`examples/rag-pipeline.json`).
+- **Line rows up with `align: "start"`** when stacked boxes should connect straight down.
+- **Leave room for labels.** A gap narrower than the edge label pushes the chip onto the boxes;
+  use a `gap` of about 7 px per label character + 50.
 
 ### edges
 
@@ -89,37 +118,42 @@ stages. Nesting depth of 2–3 labeled frames looks good; deeper gets cramped.
 - `ms`: beat length in ms (default = `speed`). Give reading-heavy beats 2500–3500.
 
 Top-level: `speed` (ms per edge hop; 1200–2200 reads well), `autoplay` (default true),
-`theme` `{ accent, fg, muted, bg, surface, border, font }` (rarely needed — the HTML page already
-does light/dark; use `--accent` for brand color).
+`theme` `{ accent, onAccent, fg, muted, bg, surface, border, font }` (rarely needed; prefer the
+`--theme` and `--accent` flags, which also set the dark palette).
 
 ### What makes it look good
 
 - **Real example data**, not placeholders: "Ada Lovelace · id 42" beats "Record". One running
-  example through all steps (the Hindsight figures follow "Alice" everywhere).
+  example through all steps (the gallery follows one order, one user, one incident throughout).
 - **Few words**: labels 1–3 words, `sub` ≤ 4 words, card rows ≤ ~40 chars, captions ≤ 15 words.
 - **2–4 steps, 3–7 beats each.** Each step answers one question ("cache miss", "cache hit").
 - **Honest**: every label, card and caption must match what the system really does. If you are
   diagramming the user's code, read the code first.
 
-## 3. Render and look at it — always
+## 3. Render, lint, and look at it: always
 
-The scripts validate ids (unknown edge/box ids, duplicates) and exit with a list of problems; fix
-and re-run. Then look at the result before handing it over — overflowing text, an arrow crossing a
-box, or a caption that doesn't match the motion are invisible in JSON. Screenshot the HTML with any
-available browser tool (serve it with `python3 -m http.server` if `file://` is blocked), once
-early and once a few seconds later to catch a later beat. Tweak `gap`, `direction`, `around`,
-`quiet`, `width` and re-render.
+The scripts reject spec mistakes (unknown ids or keys, typos like `"sho"`, invalid `tone`/`shape`)
+with a list of problems; fix and re-run. They then print **layout warnings**: an arrow through a
+box, overlapping labels, a crowded box side, crossing arrows. Each says how to fix it. Fix them all
+and re-render until none remain (`node scripts/lint.mjs spec.json` checks without rendering;
+`--strict` makes the renderers fail on warnings).
+
+Then look at the result before handing it over: a caption that doesn't match the motion, or text
+that reads badly, is invisible in JSON. `node scripts/video.mjs spec.json check.png --step N` gives
+a still of step N's final state without a browser tool. Or screenshot the HTML (serve it with
+`python3 -m http.server` if `file://` is blocked), once early and once a few seconds later.
 
 ## 4. Deliver
 
 - **HTML**: if an Artifact / publish tool is available, publish the HTML file as-is (it is fully
   self-contained). Otherwise send the file. It can also be dropped into any site or `<iframe>`.
 - **SVG**: commit it and reference it from markdown (`![how caching works](docs/cache.svg)`), or
-  send the file. GitHub renders and animates it in READMEs, PRs and issues.
-- Don't leave spec `.json` files lying around in the user's project — the output carries its spec.
+  send the file. GitHub renders and animates it in READMEs, PRs and issues. It carries an
+  accessible title and the step narration as its description.
+- **MP4 / GIF**: attach where SVG doesn't animate. Keep GIFs to one `--step` to stay small.
+- Don't leave spec `.json` files lying around in the user's project: the output carries its spec.
 
 ## Credits
 
-`interfig/` is copied from github.com/vectorize-io/hindsight (`hindsight-interfig/`), MIT license
-in `interfig/LICENSE`. `examples/` except `starter.json` are the Hindsight docs figures converted
-to JSON.
+`interfig/` is adapted from an MIT-licensed open-source figure player; its license and copyright
+notice are in `interfig/LICENSE`.

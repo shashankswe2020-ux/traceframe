@@ -4,9 +4,10 @@
 //
 // It reads the same spec and the same `route()` as the React renderer, so the two cannot drift.
 //
-// ponytail: text is measured by character count rather than by a browser, so this runs anywhere with
-// plain node. Wrapping is therefore approximate; widen a card if a line lands short.
-import { route, type Rect } from './geometry.ts';
+// Text is measured with a Helvetica width table rather than a browser, so this runs anywhere with
+// plain node. Wrapping is close but not exact; widen a card if a line lands short.
+import { route, type Rect, type Routed } from './geometry.ts';
+import { palettes, type Palette } from './themes.ts';
 import {
   edgeId,
   isGroup,
@@ -17,7 +18,6 @@ import {
   type FigGroup,
   type FigNode,
   type FigRow,
-  type FigTheme,
   type FigTone,
   type FlowProps,
 } from './model.ts';
@@ -35,8 +35,26 @@ const LABEL_LINE = 18,
 const FRAME_TOP = 37,
   FRAME_SIDE = 18,
   FRAME_BOTTOM = 18;
-/** Characters are ~0.53em wide in this font stack; enough to place a box, not to typeset a page. */
-const em = (fontSize: number) => fontSize * 0.53;
+// Helvetica advance widths (1/1000 em) for ASCII 32-126; the system UI fonts run a few percent wider.
+const ASCII = [
+  278, 278, 355, 556, 556, 889, 667, 191, 333, 333, 389, 584, 278, 333, 278, 278, 556, 556, 556, 556, 556, 556, 556, 556,
+  556, 556, 278, 278, 584, 584, 584, 556, 1015, 667, 667, 722, 722, 667, 611, 778, 722, 278, 500, 667, 556, 833, 722, 778,
+  667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 278, 278, 278, 469, 556, 333, 556, 556, 500, 556, 556, 278, 556,
+  556, 222, 222, 500, 222, 833, 556, 556, 556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 334, 260, 334, 584,
+];
+/** Rendered width of `s` in px. Wide scripts (CJK) count as a full em; monospace as 0.6em. */
+export function textW(s: string, size: number, o: { mono?: boolean; bold?: boolean } = {}): number {
+  if (o.mono) return [...s].length * 0.6 * size;
+  let u = 0;
+  for (const ch of s) {
+    const c = ch.codePointAt(0)!;
+    u += c >= 32 && c <= 126 ? ASCII[c - 32] : c >= 0x2e80 ? 1000 : 600;
+  }
+  return (u / 1000) * size * 1.07 * (o.bold ? 1.04 : 1);
+}
+const tagWidth = (tag: string) => textW(tag.toUpperCase(), 9, { bold: true }) + tag.length * 0.27 + 8;
+/** The pill an edge label sits in. */
+export const labelWidth = (label: string) => textW(label, 11, { mono: true }) + 14;
 /** The React player runs 1.25x faster than a figure's own timings. Match it so the two feel the same. */
 const BASE_RATE = 1.25;
 
@@ -62,14 +80,28 @@ const n2 = (v: number) => Math.round(v * 10) / 10;
 const pct = (v: number) => n2(v * 100) + '%';
 
 /** Break a string into lines that fit `width`, keeping the newlines it already has. */
-function wrap(s: string, width: number, fontSize: number): string[] {
-  const max = Math.max(4, Math.floor(width / em(fontSize)));
+function wrap(s: string, width: number, fontSize: number, mono = false): string[] {
+  const fits = (t: string) => textW(t, fontSize, { mono }) <= width;
+  // A word wider than the line (a URL, or CJK text with no spaces) breaks between characters.
+  const pieces = (word: string): string[] => {
+    if (fits(word)) return [word];
+    const out: string[] = [];
+    let cur = '';
+    for (const ch of word) {
+      if (cur && !fits(cur + ch)) {
+        out.push(cur);
+        cur = '';
+      }
+      cur += ch;
+    }
+    return [...out, cur];
+  };
   const out: string[] = [];
   for (const para of s.split('\n')) {
     let line = '';
-    for (const word of para.split(' ')) {
+    for (const word of para.split(' ').flatMap(pieces)) {
       if (!line) line = word;
-      else if (line.length + 1 + word.length <= max) line += ' ' + word;
+      else if (fits(line + ' ' + word)) line += ' ' + word;
       else {
         out.push(line);
         line = word;
@@ -93,24 +125,24 @@ function layoutCard(c: FigContent, width: number): { rows: Row[]; height: number
   const rows = body.map((row) => {
     // A word-sized tag heads its row so the text keeps the full width; a number or no tag sits inline.
     const heads = (row.tag?.length ?? 0) > 2;
-    const tagW = row.tag && !heads ? row.tag.length * em(9) + 13 : 0;
-    const markW = row.mark && !heads ? str(row.mark).length * em(11) + 6 : 0;
+    const tagW = row.tag && !heads ? tagWidth(row.tag) + 5 : 0;
+    const markW = row.mark && !heads ? textW(str(row.mark), 11, { bold: true }) + 6 : 0;
     const body = str(row.text) + (row.meta != null ? ' · ' + str(row.meta) : '');
-    return { row, heads, lines: wrap(body, inner - tagW - markW, row.mono ? 10.5 : 11) };
+    return { row, heads, lines: wrap(body, inner - tagW - markW, row.mono ? 10.5 : 11, row.mono) };
   });
   const height =
     rows.reduce((h, r) => h + (r.heads ? LINE : 0) + r.lines.length * LINE, 0) + ROW_GAP * Math.max(0, rows.length - 1) + CARD_PAD * 2;
   return { rows, height };
 }
 
-type Placed = Rect & { item: FigNode | FigGroup };
+export type Placed = Rect & { item: FigNode | FigGroup };
 type Sizes = { cards: Map<string, FigContent[]>; cardH: Map<string, number>; minH: (id: string) => number };
 
 function nodeWidth(item: FigNode, carded: boolean): number {
   if (item.width != null) return item.width;
   if (carded) return CARD_WIDTH;
-  const label = str(item.label).length * em(14) + 32;
-  const sub = str(item.sub).length * em(12) + 32;
+  const label = textW(str(item.label), 14, { bold: true }) + 32;
+  const sub = textW(str(item.sub), 12) + 32;
   return Math.min(NODE_MAX_W, Math.max(NODE_MIN_W, label, sub));
 }
 
@@ -158,13 +190,30 @@ function place(item: FigNode | FigGroup, x: number, y: number, s: Sizes, out: Pl
 /** One stretch of the loop: the figure holds still, showing beat `bi` of step `si`. */
 type Seg = { t0: number; t1: number; si: number; bi: number };
 
-export type SvgOptions = { speed?: number; padding?: number; theme?: FigTheme };
+export type SvgOptions = {
+  speed?: number;
+  padding?: number;
+  /** Named theme from themes.ts. */
+  preset?: string;
+  /** Single colors over the preset, applied in light and dark. */
+  theme?: Partial<Palette>;
+  /** Accessible name; the step narration becomes the description. */
+  title?: string;
+};
 
-export function toSvg(fig: FlowProps, opts: SvgOptions = {}): string {
-  const speed = (opts.speed ?? fig.speed ?? 900) / 1000 / BASE_RATE;
-  const pad = opts.padding ?? 24;
-  const steps = fig.steps ?? [];
-  const beats: Beat[][] = steps.map((s) => s.flow.map(toBeat));
+export type Layout = {
+  placed: Placed[];
+  rects: Record<string, Rect>;
+  routed: Routed[];
+  ids: string[];
+  cards: Map<string, FigContent[]>;
+  cardH: Map<string, number>;
+  beats: Beat[][];
+};
+
+/** Where every box, frame and edge goes: shared by the SVG renderer and the layout linter. */
+export function layoutFigure(fig: FlowProps, pad = 24): Layout {
+  const beats: Beat[][] = (fig.steps ?? []).map((s) => s.flow.map(toBeat));
 
   // Every content a box will ever show, so its card can be sized to the biggest one up front.
   const cards = new Map<string, FigContent[]>();
@@ -210,24 +259,38 @@ export function toSvg(fig: FlowProps, opts: SvgOptions = {}): string {
     rects,
     tips,
   );
-  const byId = Object.fromEntries(routed.map((r) => [r.id, r]));
+  return { placed, rects, routed, ids, cards, cardH, beats };
+}
 
-  // The timeline: every beat of every step, in order, with the player's hold at the end of each step.
+type Hop = { si: number; bi: number; lane: number; edge: string; back: boolean; data?: unknown; t0: number; t1: number };
+
+/** The loop's clock in seconds: every beat of every step, with the player's hold at the end of each step. */
+export function timeline(fig: FlowProps, speedMs?: number): { segs: Seg[]; hops: Hop[]; total: number } {
+  const speed = (speedMs ?? fig.speed ?? 900) / 1000 / BASE_RATE;
+  const edges = new Set(fig.edges.map(edgeId));
   const segs: Seg[] = [];
-  const hops: { si: number; bi: number; lane: number; edge: string; back: boolean; data?: unknown; t0: number; t1: number }[] = [];
+  const hops: Hop[] = [];
   let t = 0;
-  beats.forEach((stepBeats, si) => {
+  (fig.steps ?? []).forEach((step, si) => {
+    const stepBeats = step.flow.map(toBeat);
     stepBeats.forEach((b, bi) => {
       const dur = (b.ms ?? fig.speed ?? 900) / 1000 / BASE_RATE;
       const last = bi === stepBeats.length - 1;
       b.hops.forEach((h, lane) => {
-        if (byId[h.edge]) hops.push({ si, bi, lane, edge: h.edge, back: h.back, data: h.data, t0: t, t1: t + dur });
+        if (edges.has(h.edge)) hops.push({ si, bi, lane, edge: h.edge, back: h.back, data: h.data, t0: t, t1: t + dur });
       });
       segs.push({ t0: t, t1: t + dur + (last ? speed * 1.5 : 0), si, bi });
       t += dur + (last ? speed * 1.5 : 0);
     });
   });
-  const total = t || 1;
+  return { segs, hops, total: t || 1 };
+}
+
+export function toSvg(fig: FlowProps, opts: SvgOptions = {}): string {
+  const pad = opts.padding ?? 24;
+  const steps = fig.steps ?? [];
+  const { placed, routed, ids, cards, cardH, beats } = layoutFigure(fig, pad);
+  const { segs, hops, total } = timeline(fig, opts.speed);
 
   // What the figure shows during each segment, matching the React player exactly.
   const shownAt = segs.map(
@@ -331,7 +394,7 @@ export function toSvg(fig: FlowProps, opts: SvgOptions = {}): string {
         const tone = TONES[row.tone ?? 'blue'];
         const left = x + CARD_SIDE;
         const parts: string[] = [];
-        const tagW = row.tag ? row.tag.length * em(9) + 8 : 0;
+        const tagW = row.tag ? tagWidth(row.tag) : 0;
         const pill = (px: number, py: number) =>
           row.tag
             ? `<rect x="${n2(px)}" y="${n2(py)}" width="${n2(tagW)}" height="14" rx="4" fill="${tone}" fill-opacity="0.15"/>` +
@@ -368,11 +431,11 @@ export function toSvg(fig: FlowProps, opts: SvgOptions = {}): string {
       e.label == null
         ? ''
         : (() => {
-            const lw = str(e.label).length * em(11) + 14;
+            const lw = labelWidth(str(e.label));
             return (
               `<rect x="${n2(r.mid.x - lw / 2)}" y="${n2(r.mid.y - 9)}" width="${n2(lw)}" height="18" rx="9" fill="var(--bg)" stroke="var(--border)"` +
               cls(anim(on, 'fill: var(--accent); stroke: var(--accent)', 'fill: var(--bg); stroke: var(--border)', 'l')) +
-              `/><text x="${n2(r.mid.x)}" y="${n2(r.mid.y + 4)}"${cls('edgelabel', anim(on, 'fill: #fff', 'fill: var(--muted)', 'x'))}>${esc(str(e.label))}</text>`
+              `/><text x="${n2(r.mid.x)}" y="${n2(r.mid.y + 4)}"${cls('edgelabel', anim(on, 'fill: var(--on-accent)', 'fill: var(--muted)', 'x'))}>${esc(str(e.label))}</text>`
             );
           })();
     return hidden ? `<g opacity="0"${shown}>${path}${label}</g>` : path + label;
@@ -392,7 +455,7 @@ export function toSvg(fig: FlowProps, opts: SvgOptions = {}): string {
       const label = str(h.data);
       if (!label) return '';
       const lines = wrap(label, 210, 11.5);
-      const w = Math.max(...lines.map((l) => l.length)) * em(11.5) + 18;
+      const w = Math.max(...lines.map((l) => textW(l, 11.5))) + 18;
       const boxH = lines.length * 15 + 8;
       return (
         `<rect x="${n2(-w / 2)}" y="${n2(-boxH - 12)}" width="${n2(w)}" height="${n2(boxH)}" rx="8" fill="var(--accent)"/>` +
@@ -400,7 +463,7 @@ export function toSvg(fig: FlowProps, opts: SvgOptions = {}): string {
       );
     })();
     return (
-      `<g${cls(name)} opacity="0"><circle r="10" fill="var(--accent)" opacity="0.2"/><circle r="4.5" fill="var(--accent)"/>${chip}` +
+      `<g${cls('pk', name)} opacity="0"><circle r="10" fill="var(--accent)" opacity="0.2"/><circle r="4.5" fill="var(--accent)"/>${chip}` +
       `<animateMotion dur="${n2(total)}s" repeatCount="indefinite" keyTimes="0;${n2(t0)};${n2(t1)};1" keyPoints="${h.back ? '1;1;0;0' : '0;0;1;1'}" calcMode="linear">` +
       `<mpath href="#p-${esc(h.edge)}" xlink:href="#p-${esc(h.edge)}"/></animateMotion></g>`
     );
@@ -429,11 +492,24 @@ export function toSvg(fig: FlowProps, opts: SvgOptions = {}): string {
     );
   });
 
-  const t0 = { accent: '#0074d9', fg: '#111418', muted: '#4b5563', bg: '#ffffff', surface: '#f5f7fa', border: '#b6c0cc', ...opts.theme };
-  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${n2(W)}" height="${n2(H)}" viewBox="0 0 ${n2(W)} ${n2(H)}" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  const { font, ...colors } = { ...fig.theme, ...opts.theme } as Partial<Palette> & { font?: string };
+  const { light, dark } = palettes(opts.preset, colors);
+  const vars = (p: Palette) =>
+    `--accent:${p.accent}; --on-accent:${p.onAccent}; --fg:${p.fg}; --muted:${p.muted}; --bg:${p.bg}; --surface:${p.surface}; --border:${p.border}; --card-on:${p.cardOn};`;
+  const narration = steps
+    .map((s, si) => {
+      const said = beats[si].map((b) => str(b.say)).filter(Boolean);
+      return `${str(s.label)}: ${(said.length ? said : [str(s.caption)]).join(' ')}`;
+    })
+    .join(' ');
+  const title = opts.title ?? 'Animated diagram';
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${n2(W)}" height="${n2(H)}" viewBox="0 0 ${n2(W)} ${n2(H)}" role="img" aria-labelledby="fig-title fig-desc" font-family="${esc(font ?? "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif")}">
+<title id="fig-title">${esc(title)}</title>
+<desc id="fig-desc">${esc(narration || title)}</desc>
 <style>
-svg { --accent:${t0.accent}; --fg:${t0.fg}; --muted:${t0.muted}; --bg:${t0.bg}; --surface:${t0.surface}; --border:${t0.border}; --card-on:#eef5fd; }
-@media (prefers-color-scheme: dark) { svg { --accent:#3396e8; --fg:#e3e3e3; --muted:#9aa0a6; --bg:#1b1b1d; --surface:#242526; --border:#3a3b3c; --card-on:#1d2733; } }
+svg { ${vars(light)} }
+@media (prefers-color-scheme: dark) { svg { ${vars(dark)} } }
+@media (prefers-reduced-motion: reduce) { .pk { display: none; } }
 .label { fill: var(--fg); font-size: 14px; font-weight: 500; text-anchor: middle; }
 .sub { fill: var(--muted); font-size: 12px; text-anchor: middle; }
 .frame { fill: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .04em; }
@@ -443,7 +519,7 @@ svg { --accent:${t0.accent}; --fg:${t0.fg}; --muted:${t0.muted}; --bg:${t0.bg}; 
 .muted { fill: var(--muted); }
 .tag { font-size: 9px; font-weight: 600; letter-spacing: .03em; text-anchor: middle; }
 .mark { fill: var(--accent); font-size: 11px; font-weight: 600; text-anchor: end; }
-.chip { fill: #fff; font-size: 11.5px; text-anchor: middle; }
+.chip { fill: var(--on-accent); font-size: 11.5px; text-anchor: middle; }
 .steplabel { fill: var(--fg); font-size: 13px; font-weight: 600; text-anchor: middle; font-family: ui-monospace, Menlo, monospace; }
 .caption { fill: var(--muted); font-size: 13.5px; text-anchor: middle; }
 ${css.join('\n')}
