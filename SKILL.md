@@ -1,6 +1,7 @@
 ---
 name: traceframe
-description: Draw an animated, step-by-step architecture or system-flow diagram (boxes, groups, arrows with packets moving along them, cards filling with real data, narrated steps) as an interactive HTML page, an animated SVG for GitHub READMEs and PRs, or an MP4/GIF/PNG. Use when the user wants to show how something works or flows: a request path, a sequence diagram, a data or RAG pipeline, an agent loop, an auth flow, an event-driven system, a deploy, what a PR changes, or a replay of a real OpenTelemetry trace. Also converts Mermaid sequence diagrams and flowcharts. Triggers on "architecture diagram", "sequence diagram", "explain this flow", "animate", "walk me through the request".
+description: >-
+  Draw an animated, step-by-step architecture or system-flow diagram (boxes, groups, arrows with packets moving along them, cards filling with real data, narrated steps) as an interactive HTML page, an animated SVG for GitHub READMEs and PRs, or an MP4/GIF/PNG. Use when the user wants to show how something works or flows: a request path, a sequence diagram, a data or RAG pipeline, an agent loop, an auth flow, an event-driven system, a deploy, what a PR changes, or a replay of a real OpenTelemetry trace. Also converts Mermaid sequence diagrams and flowcharts. Triggers on "architecture diagram", "sequence diagram", "explain this flow", "animate", "walk me through the request".
 ---
 
 # Traceframe
